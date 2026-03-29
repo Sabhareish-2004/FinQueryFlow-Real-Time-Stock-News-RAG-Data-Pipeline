@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FinQueryFlow</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#07090f; --s1:#0d1117; --s2:#161b22; --s3:#1c2330;
+  --b1:rgba(48,120,255,.12); --b2:rgba(48,120,255,.22); --b3:rgba(48,120,255,.35);
+  --accent:#3078ff; --green:#23d18b; --red:#ff4c4c; --amber:#e5a50a; --purple:#b57bff;
+  --text:#d1d9e0; --muted:#6e7681; --dim:#3d444d;
+  --mono:'JetBrains Mono',monospace; --ui:'Outfit',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--ui);font-size:14px}
+
+/* LAYOUT */
+.app{display:grid;grid-template-rows:52px 1fr;height:100vh}
+.content{display:grid;grid-template-columns:250px 1fr 270px;min-height:0}
+
+/* TOPBAR */
+.bar{display:flex;align-items:center;padding:0 20px;border-bottom:1px solid var(--b1);background:var(--s1);gap:8px;z-index:50}
+.logo{font-family:var(--ui);font-weight:800;font-size:17px;letter-spacing:-.4px;color:#fff;margin-right:20px;white-space:nowrap}
+.logo b{color:var(--accent)}
+.nav{display:flex;flex:1}
+.ntab{padding:0 15px;height:52px;display:flex;align-items:center;font-size:13px;font-weight:500;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:all .15s;letter-spacing:.15px;white-space:nowrap}
+.ntab:hover{color:var(--text)}
+.ntab.on{color:var(--accent);border-bottom-color:var(--accent)}
+.bar-end{display:flex;align-items:center;gap:10px;margin-left:auto}
+.api-cfg{display:flex;align-items:center;gap:6px}
+.api-cfg input{padding:5px 10px;background:var(--s2);border:1px solid var(--b2);border-radius:6px;color:var(--text);font-family:var(--mono);font-size:10px;outline:none;transition:border-color .15s;width:180px}
+.api-cfg input:focus{border-color:var(--accent)}
+.api-cfg input::placeholder{color:var(--dim)}
+.cfg-label{font-size:10px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.save-btn{padding:5px 12px;background:var(--accent);border:none;border-radius:6px;color:#fff;font-weight:600;font-size:11px;cursor:pointer;white-space:nowrap;transition:opacity .15s}
+.save-btn:hover{opacity:.8}
+.live-badge{display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;border:1px solid var(--b2);font-size:10px;font-family:var(--mono);color:var(--green)}
+.dot-live{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.clk{font-family:var(--mono);font-size:10px;color:var(--dim)}
+
+/* LEFT PANEL */
+.left{overflow-y:auto;border-right:1px solid var(--b1);background:var(--s1);display:flex;flex-direction:column}
+.wl-header{padding:12px 14px 6px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}
+.tk{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;transition:background .12s;border-left:2px solid transparent;border-bottom:1px solid transparent}
+.tk:hover,.tk.on{background:var(--s2);border-left-color:var(--accent)}
+.tk.on{border-bottom-color:var(--b1)}
+.tk-sym{font-weight:700;font-size:13px;width:50px;flex-shrink:0}
+.tk-info{flex:1;min-width:0}
+.tk-name{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tk-right{text-align:right;flex-shrink:0}
+.tk-price{font-family:var(--mono);font-size:12px;font-weight:500}
+.tk-pct{font-family:var(--mono);font-size:10px;margin-top:1px}
+.up{color:var(--green)}.dn{color:var(--red)}.neu{color:var(--muted)}
+.divider{height:1px;background:var(--b1);margin:8px 0}
+.infra-hdr{padding:8px 14px 4px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}
+.infra-grid{padding:0 10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.infra-item{display:flex;align-items:center;gap:5px;padding:5px 7px;border-radius:5px;background:var(--s2);border:1px solid var(--b1)}
+.infra-name{font-size:9px;font-family:var(--mono);color:var(--muted)}
+.sd{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.sd-g{background:var(--green)}.sd-a{background:var(--amber)}.sd-r{background:var(--red)}.sd-d{background:var(--dim)}
+
+/* CENTER PANELS */
+.center{overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.panel{display:none;flex:1;flex-direction:column;overflow:hidden;min-height:0}
+.panel.on{display:flex}
+
+/* CHART AREA */
+.chart-area{padding:16px 18px;border-bottom:1px solid var(--b1);background:var(--s1);flex-shrink:0}
+.chart-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.ct-left .sym{font-weight:800;font-size:20px;letter-spacing:-.5px}
+.ct-left .co-name{font-size:10px;color:var(--muted);margin-top:2px}
+.ct-right .price{font-family:var(--mono);font-size:24px;font-weight:500}
+.ct-right .chg{font-family:var(--mono);font-size:11px;margin-top:2px}
+.pbtns{display:flex;gap:3px;margin-bottom:8px}
+.pb{padding:3px 8px;border-radius:4px;border:1px solid var(--b1);background:none;color:var(--muted);font-family:var(--mono);font-size:9px;cursor:pointer;transition:all .12s}
+.pb:hover,.pb.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.loading-bar{height:2px;background:linear-gradient(90deg,var(--accent),var(--purple),var(--accent));background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:2px;margin-bottom:4px;display:none}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.loading-bar.show{display:block}
+
+/* NEWS FEED */
+.feed{overflow-y:auto;flex:1;padding:8px 10px}
+.nc{padding:10px 12px;border-radius:7px;border:1px solid var(--b1);background:var(--s2);margin-bottom:6px;cursor:pointer;transition:border-color .12s}
+.nc:hover{border-color:var(--b2)}
+.nc-meta{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.stag{padding:1px 6px;border-radius:3px;font-size:8px;font-family:var(--mono);font-weight:500;text-transform:uppercase;letter-spacing:.5px}
+.stag-yf{background:rgba(48,120,255,.15);color:#79b8ff}
+.stag-backend{background:rgba(35,209,139,.15);color:#56d364}
+.nc-ago{font-size:9px;color:var(--dim);font-family:var(--mono);margin-left:auto}
+.nc-title{font-size:12px;line-height:1.5;color:var(--text)}
+.nc-sym{display:inline-block;margin-top:4px;font-family:var(--mono);font-size:9px;color:var(--accent);background:rgba(48,120,255,.1);padding:1px 5px;border-radius:3px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;height:120px;color:var(--dim);font-size:12px;gap:6px}
+
+/* RAG PANEL */
+.rag-wrap{display:flex;flex-direction:column;flex:1;overflow:hidden;padding:10px 12px;gap:8px}
+.quick-row{display:flex;flex-wrap:wrap;gap:5px;flex-shrink:0}
+.qb{padding:4px 10px;border-radius:20px;border:1px solid var(--b1);background:none;color:var(--muted);font-size:11px;cursor:pointer;transition:all .12s;white-space:nowrap}
+.qb:hover{border-color:var(--b2);color:var(--text)}
+.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg{padding:10px 13px;border-radius:8px;font-size:13px;line-height:1.65}
+.msg-u{background:rgba(48,120,255,.12);border:1px solid rgba(48,120,255,.22);align-self:flex-end;max-width:88%}
+.msg-a{background:var(--s2);border:1px solid var(--b1);align-self:flex-start;max-width:100%}
+.msg-lbl{font-family:var(--mono);font-size:8px;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;font-weight:500}
+.src-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.sc{padding:2px 7px;background:rgba(35,209,139,.08);border:1px solid rgba(35,209,139,.18);border-radius:3px;font-size:9px;font-family:var(--mono);color:#56d364}
+.chat-bar{display:flex;gap:7px;flex-shrink:0;border-top:1px solid var(--b1);padding-top:8px}
+.chat-in{flex:1;padding:9px 12px;background:var(--s2);border:1px solid var(--b1);border-radius:7px;color:var(--text);font-family:var(--ui);font-size:13px;outline:none;transition:border-color .15s}
+.chat-in:focus{border-color:var(--accent)}
+.chat-in::placeholder{color:var(--dim)}
+.ask-btn{padding:9px 16px;background:var(--accent);border:none;border-radius:7px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;transition:opacity .15s}
+.ask-btn:hover{opacity:.8}
+.ask-btn:disabled{opacity:.3;cursor:not-allowed}
+
+/* LOG PANEL */
+.log-area{flex:1;overflow-y:auto;padding:10px 14px;font-family:var(--mono);font-size:10px;line-height:2}
+.log-line{display:flex;gap:10px}
+.log-ts{color:var(--dim);flex-shrink:0}
+.log-msg{color:var(--muted)}
+.log-msg.ok{color:var(--green)}.log-msg.warn{color:var(--amber)}.log-msg.err{color:var(--red)}.log-msg.info{color:var(--accent)}
+
+/* RIGHT PANEL */
+.right{overflow-y:auto;border-left:1px solid var(--b1);background:var(--s1);padding:10px}
+.r-hdr{padding:4px 4px 8px;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}
+.sent-card{padding:10px 11px;border-radius:7px;border:1px solid var(--b1);background:var(--s2);margin-bottom:6px}
+.sc-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}
+.sc-sym{font-weight:700;font-size:13px}
+.sc-badge{font-size:8px;font-family:var(--mono);padding:2px 6px;border-radius:3px}
+.bull-b{background:rgba(35,209,139,.15);color:#56d364}
+.bear-b{background:rgba(255,76,76,.15);color:#ff8b82}
+.neu-b{background:rgba(110,118,129,.15);color:#8b949e}
+.sc-bar{display:flex;height:3px;border-radius:3px;overflow:hidden;gap:1px;margin-bottom:4px}
+.sc-bull{background:var(--green)}.sc-neu{background:var(--dim)}.sc-bear{background:var(--red)}
+.sc-nums{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px}
+.sc-price-detail{margin-top:7px;display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.sc-kv{font-size:9px;font-family:var(--mono)}
+.sc-k{color:var(--dim)}.sc-v{color:var(--text)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* SETUP OVERLAY */
+#overlay{position:fixed;inset:0;z-index:999;background:rgba(7,9,15,.96);display:flex;align-items:center;justify-content:center}
+.setup{background:var(--s2);border:1px solid var(--b2);border-radius:14px;padding:36px 40px;width:460px;max-width:94vw}
+.setup h1{font-size:22px;font-weight:800;margin-bottom:6px;letter-spacing:-.5px}
+.setup p{font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:24px}
+.setup p a{color:var(--accent);text-decoration:none}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:10px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:5px}
+.field input{width:100%;padding:10px 13px;background:var(--s1);border:1px solid var(--b2);border-radius:7px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:border-color .15s}
+.field input:focus{border-color:var(--accent)}
+.field input::placeholder{color:var(--dim)}
+.field .hint{font-size:10px;color:var(--dim);margin-top:4px}
+.field .hint a{color:var(--accent);text-decoration:none}
+.go-btn{width:100%;padding:13px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;margin-top:6px;transition:opacity .15s;letter-spacing:-.2px}
+.go-btn:hover{opacity:.85}
+.skip{text-align:center;margin-top:10px;font-size:11px;color:var(--dim);cursor:pointer}
+.skip:hover{color:var(--muted)}
+.error-msg{color:var(--red);font-size:11px;font-family:var(--mono);margin-top:6px;display:none}
+</style>
+</head>
+<body>
+
+<!-- SETUP OVERLAY -->
+<div id="overlay">
+  <div class="setup">
+    <h1>FinQueryFlow</h1>
+    <p>Configure your backend and AI connections. Stock data comes from your <strong>FastAPI + yfinance</strong> backend. AI Q&amp;A is powered by <strong>Claude</strong> via the Anthropic API.</p>
+    <div class="field">
+      <label>FastAPI Backend URL</label>
+      <input id="cfg-api" value="http://localhost:8000" placeholder="http://localhost:8000"/>
+      <div class="hint">Your running FinQueryFlow FastAPI server</div>
+    </div>
+    <div class="field">
+      <label>Anthropic API Key</label>
+      <input id="cfg-anth" type="password" placeholder="sk-ant-api03-..."/>
+      <div class="hint">Get one at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></div>
+    </div>
+    <div id="err-msg" class="error-msg"></div>
+    <button class="go-btn" id="go-btn" onclick="launch()">Connect &amp; Launch →</button>
+    <div class="skip" onclick="demoLaunch()">Skip — run in demo mode (simulated data)</div>
+  </div>
+</div>
+
+<!-- APP SHELL -->
+<div class="app">
+  <div class="bar">
+    <div class="logo">Fin<b>Query</b>Flow</div>
+    <div class="nav">
+      <button class="ntab on" onclick="showTab('dash',this)">Dashboard</button>
+      <button class="ntab" onclick="showTab('rag',this)">AI Q&amp;A</button>
+      <button class="ntab" onclick="showTab('news',this)">News Feed</button>
+      <button class="ntab" onclick="showTab('log',this)">Pipeline Log</button>
+    </div>
+    <div class="bar-end">
+      <div class="live-badge"><div class="dot-live"></div><span id="live-lbl">LIVE</span></div>
+      <div class="clk" id="clk"></div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- LEFT: Watchlist + Infra -->
+    <div class="left">
+      <div class="wl-header">Watchlist</div>
+      <div id="wl"></div>
+      <div class="divider"></div>
+      <div class="infra-hdr">Backend Status</div>
+      <div class="infra-grid">
+        <div class="infra-item"><div class="sd sd-d" id="ds-api"></div><span class="infra-name">FastAPI</span></div>
+        <div class="infra-item"><div class="sd sd-d" id="ds-yf"></div><span class="infra-name">yfinance</span></div>
+        <div class="infra-item"><div class="sd sd-d" id="ds-news"></div><span class="infra-name">News</span></div>
+        <div class="infra-item"><div class="sd sd-d" id="ds-claude"></div><span class="infra-name">Claude</span></div>
+      </div>
+    </div>
+
+    <!-- CENTER -->
+    <div class="center">
+
+      <!-- DASHBOARD -->
+      <div class="panel on" id="tab-dash">
+        <div class="chart-area">
+          <div class="chart-top">
+            <div class="ct-left">
+              <div class="sym" id="c-sym">—</div>
+              <div class="co-name" id="c-name">Select a ticker</div>
+            </div>
+            <div class="ct-right">
+              <div class="price" id="c-price">—</div>
+              <div class="chg" id="c-chg"></div>
+            </div>
+          </div>
+          <div class="pbtns">
+            <button class="pb" onclick="setPeriod('1d','1m',this)">1D</button>
+            <button class="pb on" onclick="setPeriod('1mo','1d',this)">1M</button>
+            <button class="pb" onclick="setPeriod('3mo','1d',this)">3M</button>
+            <button class="pb" onclick="setPeriod('1y','1wk',this)">1Y</button>
+          </div>
+          <div class="loading-bar" id="chart-loader"></div>
+          <canvas id="priceChart" height="105"></canvas>
+        </div>
+        <div class="feed" id="feed-dash">
+          <div class="empty-state">Select a ticker to load news</div>
+        </div>
+      </div>
+
+      <!-- AI Q&A -->
+      <div class="panel" id="tab-rag">
+        <div class="rag-wrap">
+          <div class="quick-row">
+            <button class="qb" onclick="setQ('What is driving NVDA price today?')">NVDA today</button>
+            <button class="qb" onclick="setQ('Summarize the latest AAPL news')">AAPL news</button>
+            <button class="qb" onclick="setQ('What risks are analysts flagging for TSLA?')">TSLA risks</button>
+            <button class="qb" onclick="setQ('Is the market bullish or bearish this week?')">Market mood</button>
+            <button class="qb" onclick="setQ('Compare MSFT vs GOOGL latest news')">MSFT vs GOOGL</button>
+          </div>
+          <div class="msgs" id="msgs">
+            <div class="msg msg-a">
+              <div class="msg-lbl">FinQueryFlow · Claude</div>
+              Ask me anything about stocks. I use real-time news from your FastAPI backend as context and answer via Claude claude-sonnet-4-20250514.
+            </div>
+          </div>
+          <div class="chat-bar">
+            <input class="chat-in" id="chat-in" placeholder="e.g. What's moving NVDA today?" onkeydown="if(event.key==='Enter')sendChat()"/>
+            <button class="ask-btn" id="ask-btn" onclick="sendChat()">Ask Claude</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- NEWS FEED -->
+      <div class="panel" id="tab-news">
+        <div class="feed" id="feed-all">
+          <div class="empty-state">Loading news feed…</div>
+        </div>
+      </div>
+
+      <!-- LOG -->
+      <div class="panel" id="tab-log">
+        <div class="log-area" id="log-area"></div>
+      </div>
+
+    </div><!-- /center -->
+
+    <!-- RIGHT: Sentiment -->
+    <div class="right">
+      <div class="r-hdr">Sentiment + Quotes</div>
+      <div id="sent"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ─── Config ────────────────────────────────────────────────────────────────
+let API = 'http://localhost:8000';
+let ANTH_KEY = '';
+let DEMO = false;
+let chart = null;
+let selectedSym = 'NVDA';
+let currentPeriod = '1mo';
+let currentInterval = '1d';
+let allNews = [];
+let stockData = {};   // sym → { price, change_pct, name, ... }
+
+const SYMBOLS = ['NVDA','AAPL','TSLA','MSFT','GOOGL','AMZN','META','AMD'];
+const NAMES = {NVDA:'NVIDIA Corp',AAPL:'Apple Inc',TSLA:'Tesla Inc',MSFT:'Microsoft',GOOGL:'Alphabet',AMZN:'Amazon',META:'Meta Platforms',AMD:'AMD Inc'};
+
+// ─── Clock ─────────────────────────────────────────────────────────────────
+setInterval(() => document.getElementById('clk').textContent = new Date().toLocaleTimeString(), 1000);
+
+// ─── Setup ─────────────────────────────────────────────────────────────────
+async function launch() {
+  API = document.getElementById('cfg-api').value.trim().replace(/\/$/, '');
+  ANTH_KEY = document.getElementById('cfg-anth').value.trim();
+  const btn = document.getElementById('go-btn');
+  const err = document.getElementById('err-msg');
+  btn.textContent = 'Connecting…'; btn.disabled = true; err.style.display = 'none';
+
+  // Ping the backend health endpoint
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) throw new Error(`Backend returned ${r.status}`);
+  } catch(e) {
+    err.textContent = `Cannot reach backend at ${API} — is FastAPI running? (${e.message})`;
+    err.style.display = 'block';
+    btn.textContent = 'Connect & Launch →'; btn.disabled = false;
+    return;
+  }
+
+  document.getElementById('overlay').style.display = 'none';
+  initApp(false);
+}
+
+function demoLaunch() {
+  DEMO = true;
+  document.getElementById('overlay').style.display = 'none';
+  initApp(true);
+}
+
+// ─── App Init ──────────────────────────────────────────────────────────────
+async function initApp(demo) {
+  log('FinQueryFlow starting…', 'info');
+  if (demo) {
+    log('Demo mode — using simulated data', 'warn');
+    document.getElementById('live-lbl').textContent = 'DEMO';
+    SYMBOLS.forEach(s => { stockData[s] = makeDemoQuote(s); });
+    renderWatchlist(); renderSentiment();
+    selectTicker('NVDA');
+    allNews = makeDemoNews();
+    renderAllNews();
+    setAllDots('a');
+    return;
+  }
+
+  setDot('ds-api','g'); log('FastAPI backend connected ✓', 'ok');
+  if (ANTH_KEY) { setDot('ds-claude','g'); log('Anthropic API key set ✓', 'ok'); }
+  else { setDot('ds-claude','a'); log('No Anthropic key — AI Q&A disabled', 'warn'); }
+
+  await fetchWatchlist();
+  renderWatchlist(); renderSentiment();
+  selectTicker('NVDA');
+  await fetchAllNews();
+
+  // Refresh quotes every 30s, news every 2 min
+  setInterval(fetchWatchlist, 30000);
+  setInterval(fetchAllNews, 120000);
+}
+
+// ─── FastAPI Calls ─────────────────────────────────────────────────────────
+async function apiFetch(path) {
+  const r = await fetch(`${API}${path}`);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+async function fetchWatchlist() {
+  try {
+    const tickers = SYMBOLS.join(',');
+    const data = await apiFetch(`/api/stocks/watchlist?tickers=${tickers}`);
+    data.results.forEach(s => { stockData[s.ticker] = s; });
+    setDot('ds-yf','g');
+    renderWatchlist(); renderSentiment();
+    if (selectedSym) updateHeader();
+    log(`Quotes refreshed for ${data.results.length} tickers`, 'ok');
+  } catch(e) {
+    setDot('ds-yf','r');
+    log(`Watchlist error: ${e.message}`, 'err');
+  }
+}
+
+async function fetchPriceHistory(sym, period, interval) {
+  try {
+    const data = await apiFetch(`/api/stocks/price/${sym}?period=${period}&interval=${interval}`);
+    return data;  // Array of {date, open, high, low, close, volume}
+  } catch(e) {
+    log(`Price history error (${sym}): ${e.message}`, 'err');
+    return null;
+  }
+}
+
+async function fetchStockInfo(sym) {
+  try {
+    return await apiFetch(`/api/stocks/info/${sym}`);
+  } catch(e) {
+    log(`Stock info error (${sym}): ${e.message}`, 'err');
+    return null;
+  }
+}
+
+async function fetchTickerNews(sym) {
+  try {
+    setDot('ds-news','g');
+    const data = await apiFetch(`/api/news/latest/${sym}?limit=12`);
+    return data.articles || [];
+  } catch(e) {
+    log(`News error (${sym}): ${e.message}`, 'err');
+    return [];
+  }
+}
+
+async function fetchAllNews() {
+  try {
+    const data = await apiFetch(`/api/news/feed?hours=24&limit=40`);
+    allNews = data.articles || [];
+    setDot('ds-news','g');
+    renderAllNews();
+    log(`News feed: ${allNews.length} articles loaded`, 'ok');
+  } catch(e) {
+    log(`News feed error: ${e.message}`, 'err');
+  }
+}
+
+// ─── Watchlist Render ──────────────────────────────────────────────────────
+function renderWatchlist() {
+  document.getElementById('wl').innerHTML = SYMBOLS.map(sym => {
+    const d = stockData[sym] || {};
+    const price = d.current_price != null ? `$${d.current_price.toFixed(2)}` : '—';
+    const pct   = d.change_pct   != null ? d.change_pct.toFixed(2) : null;
+    const cls   = pct == null ? 'neu' : pct >= 0 ? 'up' : 'dn';
+    const sign  = pct != null && pct >= 0 ? '+' : '';
+    const pctStr = pct != null ? `${sign}${pct}%` : '—';
+    const sel   = sym === selectedSym ? ' on' : '';
+    return `<div class="tk${sel}" onclick="selectTicker('${sym}')">
+      <div class="tk-sym">${sym}</div>
+      <div class="tk-info"><div class="tk-name">${d.name || NAMES[sym] || sym}</div></div>
+      <div class="tk-right">
+        <div class="tk-price">${price}</div>
+        <div class="tk-pct ${cls}">${pctStr}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Select Ticker ─────────────────────────────────────────────────────────
+async function selectTicker(sym) {
+  selectedSym = sym;
+  renderWatchlist();
+  updateHeader();
+  showLoader(true);
+
+  if (DEMO) {
+    drawDemoChart(sym);
+    renderDashNews(makeDemoNews().filter(n=>n.ticker===sym));
+    showLoader(false);
+    return;
+  }
+
+  const [history, news] = await Promise.all([
+    fetchPriceHistory(sym, currentPeriod, currentInterval),
+    fetchTickerNews(sym),
+  ]);
+  showLoader(false);
+  drawChart(history);
+  renderDashNews(news);
+}
+
+function updateHeader() {
+  const d = stockData[selectedSym] || {};
+  document.getElementById('c-sym').textContent  = selectedSym;
+  document.getElementById('c-name').textContent = d.name || NAMES[selectedSym] || '';
+  const p = d.current_price;
+  document.getElementById('c-price').textContent = p != null ? `$${p.toFixed(2)}` : '—';
+  const pct = d.change_pct;
+  if (pct != null) {
+    const sign = pct >= 0 ? '+' : '';
+    const cls  = pct >= 0 ? 'up' : 'dn';
+    // Estimate dollar change from pct (approx)
+    const dollarChg = p ? (p * pct / 100).toFixed(2) : '—';
+    document.getElementById('c-chg').innerHTML =
+      `<span class="${cls}">${sign}$${dollarChg} (${sign}${pct.toFixed(2)}%)</span> today`;
+  } else {
+    document.getElementById('c-chg').textContent = '';
+  }
+}
+
+async function setPeriod(period, interval, btn) {
+  currentPeriod = period; currentInterval = interval;
+  document.querySelectorAll('.pb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  showLoader(true);
+  if (DEMO) { drawDemoChart(selectedSym); showLoader(false); return; }
+  const history = await fetchPriceHistory(selectedSym, period, interval);
+  showLoader(false);
+  drawChart(history);
+}
+
+// ─── Chart ─────────────────────────────────────────────────────────────────
+function showLoader(show) {
+  document.getElementById('chart-loader').classList.toggle('show', show);
+}
+
+function drawChart(data) {
+  if (!data || !data.length) { drawDemoChart(selectedSym); return; }
+  const closes = data.map(d => parseFloat(d.close));
+  const labels = data.map(d => {
+    const raw = d.date;
+    const dt = new Date(raw);
+    return currentInterval === '1m' || currentInterval === '5m'
+      ? dt.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})
+      : dt.toLocaleDateString([], {month:'short', day:'numeric'});
+  });
+  renderChart(closes, labels);
+}
+
+function drawDemoChart(sym) {
+  const d = stockData[sym] || {current_price:100, change_pct:0};
+  const n = {D:78, '1d':30, '1mo':22, '3mo':66, '1y':52}[currentPeriod] || 30;
+  let p = (d.current_price || 100) * 0.92;
+  const prices = [];
+  for (let i = 0; i < n; i++) { p += (Math.random()-.47)*0.018*p; prices.push(parseFloat(p.toFixed(2))); }
+  prices.push(d.current_price || 100);
+  const now = new Date();
+  const labels = prices.map((_, i) => {
+    const d2 = new Date(now - (prices.length-i)*86400000/4);
+    return d2.toLocaleDateString([], {month:'short', day:'numeric'});
+  });
+  renderChart(prices, labels);
+}
+
+function renderChart(prices, labels) {
+  const d = stockData[selectedSym] || {change_pct: 0};
+  const color = (d.change_pct || 0) >= 0 ? '#23d18b' : '#ff4c4c';
+  if (chart) chart.destroy();
+  const ctx = document.getElementById('priceChart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: prices,
+        borderColor: color,
+        backgroundColor: color + '15',
+        borderWidth: 1.5,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: {duration: 300},
+      plugins: {
+        legend: {display: false},
+        tooltip: {
+          mode: 'index', intersect: false,
+          backgroundColor: '#161b22', borderColor: 'rgba(48,120,255,.2)', borderWidth: 1,
+          titleColor: '#6e7681', bodyColor: '#d1d9e0',
+          callbacks: {label: c => `$${c.parsed.y.toFixed(2)}`}
+        }
+      },
+      scales: {
+        x: {grid:{color:'rgba(48,120,255,.04)'}, ticks:{color:'#3d444d',maxTicksLimit:7,font:{family:'JetBrains Mono',size:9}}},
+        y: {grid:{color:'rgba(48,120,255,.04)'}, ticks:{color:'#3d444d',font:{family:'JetBrains Mono',size:9},callback:v=>`$${v.toFixed(0)}`}, position:'right'},
+      }
+    }
+  });
+}
+
+// ─── News ──────────────────────────────────────────────────────────────────
+function timeAgo(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const diff = Date.now() - d.getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
+}
+
+function newsCard(n, sourceLabel = 'yfinance') {
+  const title = (n.title || n.headline || '').slice(0, 130);
+  const sym = n.ticker || n.related || '';
+  const time = timeAgo(n.published_at || n.datetime);
+  const url = n.url || '#';
+  return `<div class="nc" onclick="window.open('${url}','_blank')">
+    <div class="nc-meta">
+      <span class="stag stag-backend">${sourceLabel}</span>
+      ${time ? `<span class="nc-ago">${time}</span>` : ''}
+    </div>
+    <div class="nc-title">${title}${title.length===130?'…':''}</div>
+    ${sym ? `<span class="nc-sym">${sym}</span>` : ''}
+  </div>`;
+}
+
+function renderDashNews(news) {
+  document.getElementById('feed-dash').innerHTML = news && news.length
+    ? news.slice(0,12).map(n=>newsCard(n,'yfinance')).join('')
+    : '<div class="empty-state">No recent news found</div>';
+}
+
+function renderAllNews() {
+  document.getElementById('feed-all').innerHTML = allNews && allNews.length
+    ? allNews.map(n=>newsCard(n,'backend')).join('')
+    : '<div class="empty-state">No news loaded yet</div>';
+}
+
+// ─── Sentiment Panel ───────────────────────────────────────────────────────
+function renderSentiment() {
+  document.getElementById('sent').innerHTML = SYMBOLS.map(sym => {
+    const d = stockData[sym] || {};
+    const pct = d.change_pct || 0;
+    let bull = 48, bear = 28, neu = 24;
+    if (pct > 3)  { bull = 75; bear = 8;  neu = 17; }
+    else if (pct > 1)  { bull = 62; bear = 18; neu = 20; }
+    else if (pct > 0)  { bull = 54; bear = 24; neu = 22; }
+    else if (pct < -3) { bull = 12; bear = 72; neu = 16; }
+    else if (pct < -1) { bull = 22; bear = 55; neu = 23; }
+    else if (pct < 0)  { bull = 38; bear = 40; neu = 22; }
+    const label = bull > 60 ? 'Bullish' : bear > 55 ? 'Bearish' : pct >= 0 ? 'Neutral+' : 'Neutral−';
+    const bc = bull > 55 ? 'bull-b' : bear > 50 ? 'bear-b' : 'neu-b';
+    const price = d.current_price != null ? `$${d.current_price.toFixed(2)}` : '—';
+    const pe = d.pe_ratio ? d.pe_ratio.toFixed(1) : '—';
+    const cap = d.market_cap ? `$${(d.market_cap/1e9).toFixed(0)}B` : '—';
+    return `<div class="sent-card">
+      <div class="sc-top">
+        <span class="sc-sym">${sym}</span>
+        <span class="sc-badge ${bc}">${label}</span>
+      </div>
+      <div class="sc-bar">
+        <div class="sc-bull" style="width:${bull}%"></div>
+        <div class="sc-neu"  style="width:${neu}%"></div>
+        <div class="sc-bear" style="width:${bear}%"></div>
+      </div>
+      <div class="sc-nums">
+        <span class="up">▲${bull}%</span><span class="neu">—${neu}%</span><span class="dn">▼${bear}%</span>
+      </div>
+      <div class="sc-price-detail">
+        <span class="sc-kv"><span class="sc-k">Price </span><span class="sc-v">${price}</span></span>
+        <span class="sc-kv"><span class="sc-k">P/E   </span><span class="sc-v">${pe}</span></span>
+        <span class="sc-kv"><span class="sc-k">Cap   </span><span class="sc-v">${cap}</span></span>
+        <span class="sc-kv"><span class="sc-k">Chg   </span><span class="sc-v ${pct>=0?'up':'dn'}">${pct>=0?'+':''}${pct.toFixed(2)}%</span></span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── Claude AI Q&A ─────────────────────────────────────────────────────────
+function setQ(q) { document.getElementById('chat-in').value = q; }
+
+async function sendChat() {
+  const inp = document.getElementById('chat-in');
+  const q = inp.value.trim();
+  if (!q) return;
+  inp.value = '';
+  const btn = document.getElementById('ask-btn');
+  btn.disabled = true;
+
+  const msgsEl = document.getElementById('msgs');
+  msgsEl.innerHTML += `<div class="msg msg-u">${q}</div>`;
+
+  const id = 'ai' + Date.now();
+  msgsEl.innerHTML += `<div class="msg msg-a" id="${id}"><div class="msg-lbl">Claude · claude-sonnet-4</div><span id="${id}t">Building context from FastAPI news…</span></div>`;
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  if (!ANTH_KEY && !DEMO) {
+    document.getElementById(id).innerHTML = `<div class="msg-lbl">No API Key</div>Add your Anthropic API key in the setup screen to enable Claude Q&A.`;
+    btn.disabled = false;
+    return;
+  }
+
+  // Gather context: latest news + live quotes
+  const newsCtx = allNews.slice(0, 20)
+    .map(n => `[${n.ticker || ''}] ${n.title || n.headline || ''}`)
+    .join('\n');
+
+  const quotesCtx = SYMBOLS.map(s => {
+    const d = stockData[s] || {};
+    return `${s}: $${d.current_price?.toFixed(2)||'?'} (${d.change_pct>=0?'+':''}${d.change_pct?.toFixed(2)||'?'}%), P/E ${d.pe_ratio?.toFixed(1)||'?'}, Cap ${d.market_cap?(d.market_cap/1e9).toFixed(0)+'B':'?'}`;
+  }).join('\n');
+
+  const systemPrompt = `You are FinQueryFlow, a sharp financial analyst AI embedded in a real-time stock dashboard.
+
+LIVE MARKET DATA (from FastAPI/yfinance backend):
+${quotesCtx}
+
+RECENT NEWS (from FastAPI news pipeline):
+${newsCtx}
+
+Answer the user's question grounded in this real data. Be concise and direct. Cite specific tickers where relevant. Flag if data is insufficient. Do not fabricate prices or events not in the context above.`;
+
+  if (DEMO) {
+    // Simulate response
+    const demoAns = `Based on the dashboard data for your query "${q}", here's what I see:\n\n${SYMBOLS.filter(s=>q.toUpperCase().includes(s)).map(s=>{const d=stockData[s]||{};return `• **${s}**: $${d.current_price?.toFixed(2)||'—'} (${d.change_pct>=0?'+':''}${d.change_pct?.toFixed(2)||'0'}%)`;}).join('\n')||'• Markets are showing mixed signals across the watchlist.'}\n\n⚠️ Add an Anthropic API key to get real Claude analysis.`;
+    await streamFake(id, demoAns);
+    btn.disabled = false;
+    return;
+  }
+
+  // Real Claude API call (streamed)
+  try {
+    setDot('ds-claude','g');
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 700,
+        stream: false,
+        system: systemPrompt,
+        messages: [{role: 'user', content: q}]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || resp.statusText);
+    }
+
+    const data = await resp.json();
+    const answer = data.content?.[0]?.text || 'No response.';
+    const usedTokens = data.usage?.input_tokens || '?';
+
+    const srcChips = `<div class="src-row">
+      <span class="sc">FastAPI/yfinance quotes</span>
+      <span class="sc">${allNews.length} news articles</span>
+      <span class="sc">${usedTokens} tokens</span>
+    </div>`;
+
+    document.getElementById(id).innerHTML =
+      `<div class="msg-lbl">Claude · claude-sonnet-4-20250514</div>${answer.replace(/\n/g,'<br/>')}${srcChips}`;
+
+    log(`Claude answered: "${q.slice(0,50)}…" (${usedTokens} tokens)`, 'ok');
+  } catch(e) {
+    document.getElementById(id).innerHTML =
+      `<div class="msg-lbl">Error</div>Claude API error: ${e.message}`;
+    setDot('ds-claude','r');
+    log(`Claude error: ${e.message}`, 'err');
+  }
+
+  btn.disabled = false;
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+async function streamFake(id, text) {
+  const words = text.split(' ');
+  let i = 0;
+  return new Promise(res => {
+    const iv = setInterval(() => {
+      const el = document.getElementById(id+'t');
+      if (!el || i >= words.length) {
+        clearInterval(iv);
+        const msgEl = document.getElementById(id);
+        if (msgEl) msgEl.innerHTML = `<div class="msg-lbl">FinQueryFlow AI (demo)</div>${text.replace(/\n/g,'<br/>')}`;
+        res();
+        return;
+      }
+      el.textContent = words.slice(0, i+1).join(' ');
+      i += 2;
+    }, 40);
+  });
+}
+
+// ─── Demo Data ─────────────────────────────────────────────────────────────
+function makeDemoQuote(sym) {
+  const base = {NVDA:136.82,AAPL:189.43,TSLA:246.73,MSFT:437.23,GOOGL:178.90,AMZN:199.45,META:548.20,AMD:166.34};
+  const chgs = {NVDA:3.24,AAPL:-0.87,TSLA:5.12,MSFT:1.33,GOOGL:0.67,AMZN:-1.20,META:4.74,AMD:2.12};
+  const pes  = {NVDA:64,AAPL:28,TSLA:72,MSFT:35,GOOGL:22,AMZN:43,META:24,AMD:55};
+  const caps = {NVDA:3.35e12,AAPL:2.91e12,TSLA:780e9,MSFT:3.25e12,GOOGL:2.21e12,AMZN:2.09e12,META:1.41e12,AMD:270e9};
+  return {
+    ticker: sym, name: NAMES[sym],
+    current_price: base[sym], change_pct: chgs[sym],
+    pe_ratio: pes[sym], market_cap: caps[sym],
+    week_52_high: base[sym]*1.18, week_52_low: base[sym]*0.68,
+  };
+}
+
+function makeDemoNews() {
+  const stories = {
+    NVDA:["NVIDIA Blackwell GPUs drive data center revenue to all-time highs","Analysts raise NVDA target to $180 on AI infrastructure boom"],
+    AAPL:["Apple Vision Pro 2 reportedly in development for late 2026","iPhone 17 supply chain ramp begins in Southeast Asia"],
+    TSLA:["Tesla Robotaxi expansion announced for 3 new US cities","TSLA short interest drops to lowest level since 2021"],
+    MSFT:["Azure AI revenue grows 33% YoY as enterprise adoption soars","Microsoft Copilot+ expands to new Surface Pro and Laptop models"],
+    GOOGL:["Gemini 2.0 Ultra outperforms GPT-4o on MMLU benchmarks","Google Search AI Overviews reach 1 billion daily users"],
+    AMZN:["AWS launches new inference chips to compete with NVIDIA H100","Amazon Prime subscriber growth slows in developed markets"],
+    META:["Meta AI assistant surpasses 1 billion users ahead of schedule","Meta unveils next-gen AR glasses with LLM on-device processing"],
+    AMD:["AMD MI300X gains traction in LLM inference vs NVIDIA H100","AMD expands Azure partnership — analysts upgrade to Strong Buy"],
+  };
+  return Object.entries(stories).flatMap(([sym, headlines]) =>
+    headlines.map((h, i) => ({
+      ticker: sym, title: h,
+      published_at: new Date(Date.now()-i*4*3600000).toISOString(),
+      url: '#'
+    }))
+  );
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.ntab').forEach(t=>t.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.getElementById('tab-'+id).classList.add('on');
+}
+
+function setDot(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'sd sd-' + ({g:'g',a:'a',r:'r',d:'d'}[state]||'d');
+}
+
+function setAllDots(state) {
+  ['ds-api','ds-yf','ds-news','ds-claude'].forEach(id => setDot(id, state));
+}
+
+function log(msg, type='') {
+  const el = document.getElementById('log-area');
+  const ts = new Date().toLocaleTimeString();
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `<span class="log-ts">${ts}</span><span class="log-msg ${type}">${msg}</span>`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+</script>
+</body>
+</html>
