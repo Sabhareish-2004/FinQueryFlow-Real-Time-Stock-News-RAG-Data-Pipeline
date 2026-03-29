@@ -1,0 +1,151 @@
+"""
+FinQueryFlow - Shared Pydantic Schemas
+Single source of truth for all data models
+"""
+
+from pydantic import BaseModel, Field, HttpUrl
+from typing import Optional, List
+from datetime import datetime
+from enum import Enum
+
+
+# ─── Enums ───────────────────────────────────────────────
+
+class NewsSource(str, Enum):
+    newsapi = "newsapi"
+    polygon = "polygon"
+    reddit  = "reddit"
+    twitter = "twitter"
+    sec     = "sec"
+
+class SentimentLabel(str, Enum):
+    positive = "positive"
+    negative = "negative"
+    neutral  = "neutral"
+
+class Period(str, Enum):
+    one_day    = "1d"
+    five_days  = "5d"
+    one_month  = "1mo"
+    three_months = "3mo"
+    six_months = "6mo"
+    one_year   = "1y"
+    two_years  = "2y"
+    five_years = "5y"
+
+
+# ─── Ingestion Models ─────────────────────────────────────
+
+class RawArticle(BaseModel):
+    """Raw article as produced by the ingestion pipeline and pushed to Kafka."""
+    source:       NewsSource
+    ticker:       str
+    title:        str
+    description:  str = ""
+    url:          str
+    published_at: str
+    content:      str = ""
+    upvotes:      Optional[int] = None   # Reddit only
+
+
+class ProcessedChunk(BaseModel):
+    """A text chunk after ETL processing, ready for embedding."""
+    id:           str
+    text:         str
+    ticker:       str
+    source:       str
+    url:          str
+    published_at: str
+
+
+# ─── RAG Models ───────────────────────────────────────────
+
+class RAGSource(BaseModel):
+    ticker:  str
+    source:  str
+    url:     str
+    score:   float = Field(ge=0.0, le=1.0)
+    date:    str
+
+class RAGRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=500)
+    ticker:   Optional[str] = None
+    stream:   bool = False
+
+class RAGResponse(BaseModel):
+    answer:  str
+    sources: List[RAGSource]
+    cached:  bool
+    latency_ms: Optional[int] = None
+
+
+# ─── Stock Models ─────────────────────────────────────────
+
+class OHLCV(BaseModel):
+    date:   str
+    open:   float
+    high:   float
+    low:    float
+    close:  float
+    volume: int
+
+class StockInfo(BaseModel):
+    ticker:        str
+    name:          str
+    sector:        Optional[str]
+    market_cap:    Optional[float]
+    pe_ratio:      Optional[float]
+    week_52_high:  Optional[float]
+    week_52_low:   Optional[float]
+    current_price: Optional[float]
+    change_pct:    Optional[float]
+
+
+# ─── Sentiment Models ─────────────────────────────────────
+
+class SentimentScore(BaseModel):
+    ticker:         str
+    vader_compound: float = Field(ge=-1.0, le=1.0)
+    finbert_label:  SentimentLabel
+    finbert_score:  float
+    article_count:  int
+    bullish_pct:    float
+    bearish_pct:    float
+    neutral_pct:    float
+    sample_headlines: List[str]
+
+
+# ─── News Models ──────────────────────────────────────────
+
+class Article(BaseModel):
+    id:           str
+    ticker:       str
+    source:       str
+    title:        str
+    url:          Optional[str]
+    published_at: Optional[str]
+    ingested_at:  Optional[str]
+
+class NewsPage(BaseModel):
+    articles: List[Article]
+    total:    int
+    page:     int
+    pages:    int
+
+
+# ─── Pipeline Health ──────────────────────────────────────
+
+class ComponentStatus(str, Enum):
+    healthy  = "healthy"
+    degraded = "degraded"
+    down     = "down"
+
+class PipelineHealth(BaseModel):
+    kafka:     ComponentStatus
+    chromadb:  ComponentStatus
+    postgres:  ComponentStatus
+    redis:     ComponentStatus
+    ingestion: ComponentStatus
+    etl:       ComponentStatus
+    rag:       ComponentStatus
+    checked_at: datetime
